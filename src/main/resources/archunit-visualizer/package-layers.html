@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>ArchUnit Package Layers</title>
+    <style>
+        html {
+            font-family: "Open Sans", Helvetica, Arial, sans-serif;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        #svg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+
+            pointer-events: none;
+        }
+
+        .layer {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+
+            padding: 5px;
+
+            border: 2px solid #b6b7bf;
+            background-color: #c3e6ff;
+        }
+
+        .package {
+            flex-grow: 1;
+
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+
+            border: 2px solid #b6b7bf;
+            background-color: #92caff;
+        }
+
+        .package.highlighted {
+            border: 2px solid gray;
+        }
+
+
+        .package-name {
+            padding-left: 2px;
+        }
+
+        .package-name:has(~.java-classes) {
+            font-size: 70%;
+        }
+
+        .package-name:only-child {
+            /* */
+        }
+
+        .java-classes {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+
+            padding: 5px;
+        }
+
+        .java-class {
+            flex-grow: 1;
+
+            padding: 2px;
+
+            border: 2px solid #b6b7bf;
+            background-color: #50a7f9;
+        }
+
+        .java-class.added {
+            color: #1d740b;
+        }
+
+        .java-class.removed {
+            color: #777;
+        }
+
+        .java-class.highlighted {
+            border: 2px solid gray;
+        }
+    </style>
+</head>
+
+<body>
+    <template id="layer-template">
+        <div class="layer"></div>
+    </template>
+    <template id="package-template">
+        <div data-name="{{}}" class="package">
+            <div class="package-name">{{}}</div>
+        </div>
+    </template>
+    <template id="java-classes-template">
+        <div class="java-classes">
+        </div>
+    </template>
+    <template id="java-class-template">
+        <div data-name="{{}}" class="java-class">
+            {{}}
+        </div>
+    </template>
+
+    <div id="container">
+    </div>
+
+    <svg id="svg-overlay"></svg>
+
+    <script type="module">
+        /*
+        const graph = {
+            packageLayers: [
+                [
+                    {
+                        name: 'demo',
+                        classes: []
+                    },
+                    {
+                        name: 'demo.sub',
+                        classes: [{ name: 'MyClass', added: true }]
+                    },
+                ],
+                [
+                    {
+                        name: 'demo.sub2',
+                        classes: []
+                    },
+                ],
+                [
+                    {
+                        name: 'demo.sub3',
+                        classes: [{ name: 'MyClass2', added: true }, { name: 'MyClass3', removed: true }]
+                    },
+
+                ],
+            ],
+            dependencies: {
+                'demo.sub.MyClass': [{ name: 'demo.sub3.MyClass3', added: true }, { name: 'demo.sub2' }],
+                'demo.sub3.MyClass3': [{ name: 'demo.sub2' }],
+                'demo.sub2': [{ name: 'demo.sub.MyClass' }],
+            },
+        }
+        */
+
+        const graph = /* {{ */ undefined /* }} */;
+
+        let highlighted = undefined;
+
+        function renderGraph() {
+            const containerEl = document.getElementById('container');
+            containerEl.innerHTML = '';
+
+            const layerTemplateEl = document.getElementById('layer-template');
+            const packageTemplateEl = document.getElementById('package-template');
+            const javaClassesTemplate = document.getElementById('java-classes-template');
+            const javaClassTemplate = document.getElementById('java-class-template');
+
+            for (const layer of graph.packageLayers) {
+                const layerFragment = layerTemplateEl.content.cloneNode(true);
+
+                for (const pkg of layer) {
+                    const packageFragment = packageTemplateEl.content.cloneNode(true);
+                    packageFragment.querySelector('.package').dataset.name = pkg.name;
+                    packageFragment.querySelector('.package-name').innerHTML = pkg.name;
+
+                    if (pkg.classes?.length > 0) {
+                        const javaClassesFragment = javaClassesTemplate.content.cloneNode(true);
+
+                        for (const javaClass of pkg.classes) {
+                            const javaClassFragment = javaClassTemplate.content.cloneNode(true);
+
+                            const javaClassEl = javaClassFragment.querySelector('.java-class');
+                            javaClassEl.dataset.name = pkg.name + '.' + javaClass.name;
+                            javaClassEl.innerHTML = javaClass.name;
+                            if (javaClass.added) {
+                                javaClassEl.classList.add('added');
+                            } else if (javaClass.removed) {
+                                javaClassEl.classList.add('removed');
+                            }
+
+                            javaClassesFragment.querySelector('.java-classes').appendChild(javaClassFragment);
+                        }
+
+                        packageFragment.querySelector('.package').appendChild(javaClassesFragment);
+                    }
+
+                    layerFragment.querySelector('.layer').appendChild(packageFragment);
+                }
+
+                containerEl.appendChild(layerFragment);
+            }
+        }
+        renderGraph();
+
+        document.querySelectorAll('.package, .java-class').forEach(highlightableEl => {
+            highlightableEl.addEventListener('mouseenter', () => {
+                highlightableEl.classList.add('highlighted');
+                highlighted = highlightableEl.dataset.name;
+                updateArrows();
+            });
+
+            highlightableEl.addEventListener('mouseleave', () => {
+                highlightableEl.classList.remove('highlighted');
+                highlighted = undefined;
+                updateArrows();
+            });
+        });
+
+        function updateArrows() {
+            const svgEl = document.getElementById('svg-overlay');
+            const containerEl = document.getElementById('container');
+
+            svgEl.querySelectorAll('.arrow-line').forEach(lineEl => lineEl.remove());
+            svgEl.querySelectorAll('.arrow-head').forEach(headEl => headEl.remove());
+
+            for (const [origin, targets] of Object.entries(graph.dependencies)) {
+                for (const target of targets) {
+                    const fromEl = containerEl.querySelector('[data-name="' + origin + '"]');
+                    const toEl = containerEl.querySelector('[data-name="' + target.name + '"]');
+
+                    if (target.added || target.removed || origin === highlighted) {
+                        drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black' });
+                    }
+                }
+            }
+        }
+
+        function drawArrow(fromEl, toEl, svgEl, options) {
+            function shortenLine(p1, p2, amount = 5) {
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const currentLength = Math.hypot(dx, dy);
+
+                if (currentLength <= amount) {
+                    return { x: p1.x, y: p1.y };
+                }
+
+                const factor = (currentLength - amount) / currentLength;
+
+                return {
+                    x: p1.x + dx * factor,
+                    y: p1.y + dy * factor
+                };
+            }
+
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+
+            const x1 = fromRect.x + fromRect.width / 2 + window.scrollX;
+            const y1 = fromRect.y + fromRect.height / 2 + window.scrollY;
+            const x2 = toRect.x + toRect.width / 2 + window.scrollX;
+            const y2 = toRect.y + toRect.height / 2 + window.scrollY;
+
+            // shorten line to avoid that the end of the line is visible at the tip of the arrow head
+            const { x: x2Shorten, y: y2Shorten } = shortenLine({ x: x1, y: y1 }, { x: x2, y: y2 }, 5);
+
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+            var lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            lineEl.classList.add('arrow-line');
+            lineEl.setAttribute('stroke', options?.color ?? 'black');
+            lineEl.setAttribute('stroke-width', '2');
+            lineEl.setAttribute('x1', x1);
+            lineEl.setAttribute('y1', y1);
+            lineEl.setAttribute('x2', x2Shorten);
+            lineEl.setAttribute('y2', y2Shorten);
+
+            var headEl = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            headEl.classList.add('arrow-head');
+            headEl.setAttribute('fill', options?.color ?? 'black');
+            headEl.setAttribute("points", "0,0 -15,-7 -15,7");
+            headEl.setAttribute("transform", `translate(${x2}, ${y2}) rotate(${angle})`);
+
+            svgEl.appendChild(lineEl);
+            svgEl.appendChild(headEl);
+        }
+
+        updateArrows();
+        window.addEventListener('resize', updateArrows);
+    </script>
+</body>
+
+</html>
