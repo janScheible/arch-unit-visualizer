@@ -25,6 +25,8 @@
             left: 0;
             width: 100%;
             height: 100%;
+			
+			margin: -8px;
 
             pointer-events: none;
         }
@@ -213,15 +215,17 @@
         }
         renderGraph();
 
-        document.querySelectorAll('.package, .java-class').forEach(highlightableEl => {
-            highlightableEl.addEventListener('mouseenter', () => {
-                highlightableEl.classList.add('highlighted');
-                highlighted = highlightableEl.dataset.name;
+        document.querySelectorAll('.package').forEach(highlightableEl => {
+            highlightableEl.addEventListener('mouseover', (e) => {
+				const target = e.target.classList.contains('package-name') ? e.target.closest('.package') : e.target;
+                target.classList.add('highlighted');
+                highlighted = target.dataset.name;
                 updateArrows();
             });
 
-            highlightableEl.addEventListener('mouseleave', () => {
-                highlightableEl.classList.remove('highlighted');
+            highlightableEl.addEventListener('mouseout', (e) => {
+				const target = e.target.classList.contains('package-name') ? e.target.closest('.package') : e.target;
+                target.classList.remove('highlighted');
                 highlighted = undefined;
                 updateArrows();
             });
@@ -240,7 +244,9 @@
                     const toEl = containerEl.querySelector('[data-name="' + target.name + '"]');
 
                     if (target.added || target.removed || origin === highlighted) {
-                        drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black' });
+                        const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black', toBottom : target.added || target.removed });
+						lineEl.dataset.from = origin;
+						lineEl.dataset.to = target.name;
                     }
                 }
             }
@@ -292,8 +298,15 @@
             headEl.setAttribute("points", "0,0 -15,-7 -15,7");
             headEl.setAttribute("transform", `translate(${x2}, ${y2}) rotate(${angle})`);
 
-            svgEl.appendChild(lineEl);
-            svgEl.appendChild(headEl);
+			if(options?.toBottom) {
+				svgEl.prepend(lineEl);
+				svgEl.prepend(headEl);				
+			} else {
+				svgEl.appendChild(lineEl);
+				svgEl.appendChild(headEl);
+			}
+			
+			return { lineEl, headEl };
         }
 
         updateArrows();
