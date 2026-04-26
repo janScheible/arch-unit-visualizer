@@ -136,6 +136,7 @@
     <script type="module">
         /*
         const graph = {
+            diff: true,
             packageLayers: [
                 [
                     {
@@ -171,7 +172,30 @@
 
         const graph = /* {{ */ undefined /* }} */;
 
+        if (graph.diff) {
+            setInterval(() => {
+                if(document.visibilityState === 'visible') {
+                    location.reload(true);
+                }
+            }, 3000);
+        }
+
+        const incomingDependencies = {};
+        for (const [origin, targets] of Object.entries(graph.dependencies)) {
+            for (const target of targets) {
+                if (!incomingDependencies.hasOwnProperty(target.name)) {
+                    incomingDependencies[target.name] = [];
+                }
+                incomingDependencies[target.name].push({ name: origin, added: target.added, removed: target.removed });
+            }
+        }
+
         let highlighted = undefined;
+
+        function hasAddedOrRemovedDependency(javaClassName) {
+            const allDependencies = (graph.dependencies[javaClassName] ?? []).concat(incomingDependencies[javaClassName] ?? []);
+            return allDependencies.filter(dependency => dependency.added || dependency.removed).length > 0;
+        }
 
         function renderGraph() {
             const containerEl = document.getElementById('container');
@@ -194,18 +218,20 @@
                         const javaClassesFragment = javaClassesTemplate.content.cloneNode(true);
 
                         for (const javaClass of pkg.classes) {
-                            const javaClassFragment = javaClassTemplate.content.cloneNode(true);
+                            if(!graph.diff || hasAddedOrRemovedDependency(pkg.name + '.' + javaClass.name)) {
+                                const javaClassFragment = javaClassTemplate.content.cloneNode(true);
 
-                            const javaClassEl = javaClassFragment.querySelector('.java-class');
-                            javaClassEl.dataset.name = pkg.name + '.' + javaClass.name;
-                            javaClassEl.innerHTML = javaClass.name;
-                            if (javaClass.added) {
-                                javaClassEl.classList.add('added');
-                            } else if (javaClass.removed) {
-                                javaClassEl.classList.add('removed');
+                                const javaClassEl = javaClassFragment.querySelector('.java-class');
+                                javaClassEl.dataset.name = pkg.name + '.' + javaClass.name;
+                                javaClassEl.innerHTML = javaClass.name;
+                                if (javaClass.added) {
+                                    javaClassEl.classList.add('added');
+                                } else if (javaClass.removed) {
+                                    javaClassEl.classList.add('removed');
+                                }
+
+                                javaClassesFragment.querySelector('.java-classes').appendChild(javaClassFragment);
                             }
-
-                            javaClassesFragment.querySelector('.java-classes').appendChild(javaClassFragment);
                         }
 
                         packageFragment.querySelector('.package').appendChild(javaClassesFragment);
@@ -242,16 +268,35 @@
             svgEl.querySelectorAll('.arrow-line').forEach(lineEl => lineEl.remove());
             svgEl.querySelectorAll('.arrow-head').forEach(headEl => headEl.remove());
 
+            // outgoing dependencies
             for (const [origin, targets] of Object.entries(graph.dependencies)) {
                 for (const target of targets) {
                     const fromEl = containerEl.querySelector('[data-name="' + origin + '"]');
                     const toEl = containerEl.querySelector('[data-name="' + target.name + '"]');
+                    if(!fromEl || !toEl) {
+                        continue;
+                    }
 
                     if (target.added || target.removed || origin === highlighted) {
                         const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black', toBottom : target.added || target.removed });
 						lineEl.dataset.from = origin;
 						lineEl.dataset.to = target.name;
                     }
+                }
+            }
+
+            // incoming dependencies
+            if (highlighted) {
+                for (const origin of incomingDependencies[highlighted] ?? []) {
+                    const fromEl = containerEl.querySelector('[data-name="' + origin.name + '"]');
+                    const toEl = containerEl.querySelector('[data-name="' + highlighted + '"]');
+                    if(!fromEl || !toEl) {
+                        continue;
+                    }
+
+                    const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl);
+                    lineEl.dataset.from = origin.name;
+                    lineEl.dataset.to = highlighted;
                 }
             }
         }
