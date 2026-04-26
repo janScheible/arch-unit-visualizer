@@ -66,7 +66,7 @@
 			cursor: default;
         }
 
-        .package-name:has(~.java-classes) {
+        .package-name:has(~.java-classes:not(.hidden)) {
             font-size: 70%;
         }
 
@@ -84,6 +84,10 @@
             padding: 5px;
 			
 			cursor: default;
+        }
+
+        .java-classes.hidden {
+            display: none;
         }
 
         .java-class {
@@ -216,6 +220,10 @@
 
                     if (pkg.classes?.length > 0) {
                         const javaClassesFragment = javaClassesTemplate.content.cloneNode(true);
+                        const javaClassesEl = javaClassesFragment.querySelector('.java-classes');
+                        if(!graph.diff && sessionStorage.getItem(pkg.name) !== 'expanded') {
+                            javaClassesEl.classList.add('hidden');
+                        }
 
                         for (const javaClass of pkg.classes) {
                             if(!graph.diff || hasAddedOrRemovedDependency(pkg.name + '.' + javaClass.name)) {
@@ -230,7 +238,7 @@
                                     javaClassEl.classList.add('removed');
                                 }
 
-                                javaClassesFragment.querySelector('.java-classes').appendChild(javaClassFragment);
+                                javaClassesEl.appendChild(javaClassFragment);
                             }
                         }
 
@@ -245,19 +253,36 @@
         }
         renderGraph();
 
-        document.querySelectorAll('.package').forEach(highlightableEl => {
-            highlightableEl.addEventListener('mouseover', (e) => {
+        document.querySelectorAll('.package').forEach(packageEl => {
+            packageEl.addEventListener('mouseover', (e) => {
 				const target = e.target.classList.contains('package-name') ? e.target.closest('.package') : e.target;
                 target.classList.add('highlighted');
                 highlighted = target.dataset.name;
                 updateArrows();
             });
 
-            highlightableEl.addEventListener('mouseout', (e) => {
+            packageEl.addEventListener('mouseout', (e) => {
 				const target = e.target.classList.contains('package-name') ? e.target.closest('.package') : e.target;
                 target.classList.remove('highlighted');
                 highlighted = undefined;
                 updateArrows();
+            });
+        });
+
+        document.querySelectorAll('.package-name').forEach(packageNameEl => {
+            packageNameEl.addEventListener('click', e => {
+                const javaClassesEl = e.target.parentElement.querySelector('.java-classes');
+                if(javaClassesEl) {
+                    const packageName = e.target.closest('.package').dataset.name;
+                    if(javaClassesEl.classList.contains('hidden')) {
+                        javaClassesEl.classList.remove('hidden');
+                        sessionStorage.setItem(packageName, 'expanded');
+                    } else {
+                        javaClassesEl.classList.add('hidden');
+                        sessionStorage.removeItem(packageName);
+                    }
+                    updateArrows();
+                }
             });
         });
 
@@ -271,13 +296,17 @@
             // outgoing dependencies
             for (const [origin, targets] of Object.entries(graph.dependencies)) {
                 for (const target of targets) {
-                    const fromEl = containerEl.querySelector('[data-name="' + origin + '"]');
-                    const toEl = containerEl.querySelector('[data-name="' + target.name + '"]');
+                    let fromEl = containerEl.querySelector('[data-name="' + origin + '"]');
+                    let toEl = containerEl.querySelector('[data-name="' + target.name + '"]');
                     if(!fromEl || !toEl) {
                         continue;
                     }
 
                     if (target.added || target.removed || origin === highlighted) {
+                        // if one of the dependecy elements is hidden (only possible for Java classes) use the package element instead
+                        fromEl = fromEl.offsetParent !== null ? fromEl : fromEl.closest('.package');
+                        toEl = toEl.offsetParent !== null ? toEl : toEl.closest('.package');
+
                         const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black', toBottom : target.added || target.removed });
 						lineEl.dataset.from = origin;
 						lineEl.dataset.to = target.name;
@@ -288,11 +317,15 @@
             // incoming dependencies
             if (highlighted) {
                 for (const origin of incomingDependencies[highlighted] ?? []) {
-                    const fromEl = containerEl.querySelector('[data-name="' + origin.name + '"]');
-                    const toEl = containerEl.querySelector('[data-name="' + highlighted + '"]');
+                    let fromEl = containerEl.querySelector('[data-name="' + origin.name + '"]');
+                    let toEl = containerEl.querySelector('[data-name="' + highlighted + '"]');
                     if(!fromEl || !toEl) {
                         continue;
                     }
+
+                    // if one of the dependecy elements is hidden (only possible for Java classes) use the package element instead
+                    fromEl = fromEl.offsetParent !== null ? fromEl : fromEl.closest('.package');
+                    toEl = toEl.offsetParent !== null ? toEl : toEl.closest('.package');
 
                     const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl);
                     lineEl.dataset.from = origin.name;
