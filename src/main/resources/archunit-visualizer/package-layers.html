@@ -100,7 +100,7 @@
         }
 
         .java-class.added {
-            color: #1d740b;
+            color: blue;
         }
 
         .java-class.removed {
@@ -307,7 +307,7 @@
                         fromEl = fromEl.offsetParent !== null ? fromEl : fromEl.closest('.package');
                         toEl = toEl.offsetParent !== null ? toEl : toEl.closest('.package');
 
-                        const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'green' : target.removed ? 'red' : 'black', toBottom : target.added || target.removed });
+                        const { lineEl, headEl } = drawArrow(fromEl, toEl, svgEl, { color: target.added ? 'blue' : target.removed ? '#777' : 'black', toBottom: target.added || target.removed });
 						lineEl.dataset.from = origin;
 						lineEl.dataset.to = target.name;
                     }
