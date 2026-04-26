@@ -45,18 +45,18 @@ public class ArchUnitVisualizer {
 	public static void packageLayers(JavaClasses classes, String referenceBranch, Class<?> rootClass)
 			throws IOException {
 		String currentBranch = Result.attempt(() -> Files.readString(Path.of("./.git/HEAD")))
-				.flatMap(gitHead -> Result
+			.flatMap(gitHead -> Result
 				.attempt(() -> Stream.of(gitHead.split("/")).reduce((first, second) -> second).get()))
-				.map(String::trim)
-				.getOrElseThrow(() -> new IllegalStateException(
-				"Can't determine the current Git branch. Is the projet directory a git repository at all?"));
+			.map(String::trim)
+			.getOrElseThrow(() -> new IllegalStateException(
+					"Can't determine the current Git branch. Is the projet directory a git repository at all?"));
 
 		String currentReportJson = packageLayersReportJson(classes, currentBranch, referenceBranch, rootClass);
 
 		Files.writeString(Path.of("./target/package-layers-" + currentBranch + ".json"), currentReportJson);
 		if (!currentBranch.equals(referenceBranch)) {
 			String referenceReportJson = Files
-					.readString(Path.of("./target/package-layers-" + referenceBranch + ".json"), StandardCharsets.UTF_8);
+				.readString(Path.of("./target/package-layers-" + referenceBranch + ".json"), StandardCharsets.UTF_8);
 
 			currentReportJson = packageLayersDiffReportJson(referenceReportJson, currentReportJson);
 		}
@@ -90,8 +90,8 @@ public class ArchUnitVisualizer {
 					continue;
 				}
 				String targetClassName = dependency.getTargetClass()
-						.getFullName()
-						.substring(targetPackageName.length() + 1);
+					.getFullName()
+					.substring(targetPackageName.length() + 1);
 
 				if (targetPackageName.startsWith(rootClass.getPackageName())) {
 					packageClassesMapping.computeIfAbsent(targetPackageName, _ -> new HashSet<>()).add(targetClassName);
@@ -104,12 +104,15 @@ public class ArchUnitVisualizer {
 						packageDependencyGraph.addVertex(targetPackageName);
 						packageDependencyGraph.addEdge(sourcePackageName, targetPackageName);
 
-						allDependencyGraph.computeIfAbsent(sourcePackageName, _ -> new HashSet<>()).add(targetPackageName);
+						allDependencyGraph.computeIfAbsent(sourcePackageName, _ -> new HashSet<>())
+							.add(targetPackageName);
 					}
 
-					if (!(sourcePackageName + "." + sourceClassName).equals(targetPackageName + "." + targetClassName)) {
-						allDependencyGraph.computeIfAbsent(sourcePackageName + "." + sourceClassName, _ -> new HashSet<>())
-								.add(targetPackageName + "." + targetClassName);
+					if (!(sourcePackageName + "." + sourceClassName)
+						.equals(targetPackageName + "." + targetClassName)) {
+						allDependencyGraph
+							.computeIfAbsent(sourcePackageName + "." + sourceClassName, _ -> new HashSet<>())
+							.add(targetPackageName + "." + targetClassName);
 					}
 				}
 			}
@@ -142,19 +145,19 @@ public class ArchUnitVisualizer {
 		List<List<String>> layers = new ArrayList<>();
 
 		EiglspergerLayoutAlgorithm<String, Integer> layoutAlgorithm = EiglspergerLayoutAlgorithm
-				.<String, Integer>edgeAwareBuilder()
-				.threaded(false)
-				.build();
+			.<String, Integer>edgeAwareBuilder()
+			.threaded(false)
+			.build();
 		LayoutModel<String> layoutModel = LayoutModel.<String>builder()
-				.size(100, 100)
-				.graph(packageDependencyGraph)
-				.build();
+			.size(100, 100)
+			.graph(packageDependencyGraph)
+			.build();
 		layoutAlgorithm.visit(layoutModel);
 
 		Map<Integer, List<Entry<String, Point>>> layerCoordPackagesMapping = layoutModel.getLocations()
-				.entrySet()
-				.stream()
-				.collect(Collectors.groupingBy(e -> (int) e.getValue().y));
+			.entrySet()
+			.stream()
+			.collect(Collectors.groupingBy(e -> (int) e.getValue().y));
 		ArrayList<Integer> layerCoords = new ArrayList<>(layerCoordPackagesMapping.keySet());
 		Collections.sort(layerCoords);
 
@@ -164,8 +167,8 @@ public class ArchUnitVisualizer {
 
 			List<Entry<String, Point>> packages = layerCoordPackagesMapping.getOrDefault(layerCoord, List.of());
 			packages.stream()
-					.sorted((a, b) -> Double.compare(a.getValue().x, b.getValue().x))
-					.forEach(e -> layer.add(e.getKey()));
+				.sorted((a, b) -> Double.compare(a.getValue().x, b.getValue().x))
+				.forEach(e -> layer.add(e.getKey()));
 		}
 
 		return layers;
@@ -187,10 +190,10 @@ public class ArchUnitVisualizer {
 					packageDependencyGraph.addVertex(packageName);
 					for (JsonValue clss : pkg.asJsonObject().getJsonArray("classes")) {
 						packageClassesMapping.computeIfAbsent(packageName, _ -> new HashSet<>())
-								.add(clss.asJsonObject().getString("name"));
+							.add(clss.asJsonObject().getString("name"));
 
 						javaClassWithPackages
-								.add(new JavaClassWithPackage(packageName, clss.asJsonObject().getString("name")));
+							.add(new JavaClassWithPackage(packageName, clss.asJsonObject().getString("name")));
 					}
 				}
 			}
@@ -221,43 +224,42 @@ public class ArchUnitVisualizer {
 		List<List<String>> packageLayers = calcPackageLayers(packageDependencyGraph);
 
 		List<List<Map<String, Object>>> packageLayersJson = packageLayers.stream()
-				.map(layer -> layer.stream()
+			.map(layer -> layer.stream()
 				.map(pkg -> Map.of("name", pkg, "classes",
-				packageClassesMapping.getOrDefault(pkg, Set.of())
-						.stream()
-						.sorted()
-						.map(clss -> Map.of("name", clss, "removed",
-						popualtionDiff.javaClassWithPackagesDiff.removed
-								.contains(new JavaClassWithPackage(pkg, clss)),
-						"added",
-						popualtionDiff.javaClassWithPackagesDiff.added
-								.contains(new JavaClassWithPackage(pkg, clss))))
-						.toList()))
+						packageClassesMapping.getOrDefault(pkg, Set.of())
+							.stream()
+							.sorted()
+							.map(clss -> Map.of("name", clss, "removed",
+									popualtionDiff.javaClassWithPackagesDiff.removed
+										.contains(new JavaClassWithPackage(pkg, clss)),
+									"added",
+									popualtionDiff.javaClassWithPackagesDiff.added
+										.contains(new JavaClassWithPackage(pkg, clss))))
+							.toList()))
 				.toList())
-				.toList();
+			.toList();
 
 		Function<String, Boolean> isPackage = pckg -> packageDependencyGraph.vertexSet().contains(pckg);
 
 		Map<String, List<Map<String, Object>>> dependenciesJson = allDependencyGraph.entrySet()
-				.stream()
-				.collect(
-						Collectors
-								.toMap(Entry::getKey,
-										e -> e.getValue()
-												.stream()
-												.sorted()
-												.map(name -> Map
-												.<String, Object>of("name", name, "removed",
-														!isPackage.apply(e.getKey()) && !isPackage.apply(name)
-														&& popualtionDiff.dependenciesDiff.removed
-																.contains(new PackageOrJavaClassDependency(e.getKey(), name)),
-														"added",
-														!isPackage.apply(e.getKey()) && !isPackage.apply(name)
-														&& popualtionDiff.dependenciesDiff.added
-																.contains(new PackageOrJavaClassDependency(e.getKey(), name))))
-												.toList()));
+			.stream()
+			.collect(
+					Collectors.toMap(Entry::getKey,
+							e -> e.getValue()
+								.stream()
+								.sorted()
+								.map(name -> Map.<String, Object>of("name", name, "removed",
+										!isPackage.apply(e.getKey()) && !isPackage.apply(name)
+												&& popualtionDiff.dependenciesDiff.removed
+													.contains(new PackageOrJavaClassDependency(e.getKey(), name)),
+										"added",
+										!isPackage.apply(e.getKey()) && !isPackage.apply(name)
+												&& popualtionDiff.dependenciesDiff.added
+													.contains(new PackageOrJavaClassDependency(e.getKey(), name))))
+								.toList()));
 
-		Map<String, Object> graphJson = Map.of("packageLayers", packageLayersJson, "dependencies", dependenciesJson);
+		Map<String, Object> graphJson = Map.of("diff", !popualtionDiff.empty(), "packageLayers", packageLayersJson,
+				"dependencies", dependenciesJson);
 
 		StringWriter out = new StringWriter();
 		try (JsonWriter writer = Json.createWriter(out)) {
@@ -287,6 +289,10 @@ public class ArchUnitVisualizer {
 
 			return new SetDiff<>(added, removed);
 		}
+
+		private boolean empty() {
+			return this.added.isEmpty() && this.removed.isEmpty();
+		}
 	}
 
 	private record PopulationDiff(SetDiff<JavaClassWithPackage> javaClassWithPackagesDiff,
@@ -295,6 +301,10 @@ public class ArchUnitVisualizer {
 		private static PopulationDiff diff(PopulationResult previous, PopulationResult current) {
 			return new PopulationDiff(SetDiff.diff(previous.javaClassWithPackages(), current.javaClassWithPackages()),
 					SetDiff.diff(previous.dependencies(), current.dependencies()));
+		}
+
+		private boolean empty() {
+			return this.javaClassWithPackagesDiff.empty() && this.dependenciesDiff.empty();
 		}
 	}
 
